@@ -1,0 +1,114 @@
+/**
+ *  Package and Import Specifications
+ */
+import java_cup.runtime.*;
+import java.lang.*;
+
+/**
+ *  Usercode Components
+ */
+parser code {:
+    // Connect this parser to a scanner!
+    Scanner s;
+    Parser(Scanner s){ this.s=s; };
+:}
+
+/* define how to connect to the scanner! */
+scan with {: return s.next_token(); :};
+
+/**
+ *  Symbol Lists
+ */
+
+/* Terminals (tokens returned by the scanner). */
+terminal                        CONCATENATE, LPAREN, RPAREN, COMMA, LBRACKET, RBRACKET;
+terminal String                 PREFIX, SUFFIX, IF, ELSE;
+terminal String                 STRING, IDENTIFIER;
+
+/*  Non terminals */
+non terminal StringBuffer       program, functdeclar, functdeclar2, commands, commands2, argsdeclar, argsdeclar2, args;
+non terminal StringBuffer       args2, condition, cond, cond2, ifbody, ifbody2, functbody, functbody2;
+
+/**
+ *  Precedence Declarations
+ */
+precedence left PREFIX, SUFFIX;
+precedence left CONCATENATE;
+precedence left IF;
+
+/**
+ *  The Grammar Rules
+ */
+
+start with program;
+
+program       ::= functdeclar:f                                                                         {: System.out.println("import java.io.*;\n\npublic class Main {" + "\n" + f + "\n}"); :}
+;   
+functdeclar   ::= IDENTIFIER:id LPAREN argsdeclar:a LBRACKET functbody:f functdeclar2:fd2               {: RESULT = new StringBuffer("\tpublic static String " 
+                                                                                                        + id + "(" + a + "{\n\t\t" + f + "\n" + fd2); :}
+;
+functdeclar2  ::=IDENTIFIER:id LPAREN argsdeclar:a LBRACKET functbody:f functdeclar2:fd2                {: RESULT = new StringBuffer("\tpublic static String " + id + "(" + a + "{\n\t\t" + f + "\n" + fd2); :}
+                |IDENTIFIER:id LPAREN args:a commands:c                                                 {: RESULT = new StringBuffer("\tpublic static void main(String[] args){\n\t\t" + 
+                                                                                                        "System.out.println(" + id + "(" + a + c + "\n\t}"); :}
+;
+argsdeclar    ::=  IDENTIFIER:id argsdeclar2:a                                                          {: RESULT = new StringBuffer("String " + id + a); :}
+                |RPAREN                                                                                 {: RESULT = new StringBuffer(")"); :}
+;   
+argsdeclar2   ::= COMMA IDENTIFIER:id argsdeclar2:a                                                     {: RESULT = new StringBuffer(", String " + id + a); :}
+                |RPAREN                                                                                 {: RESULT = new StringBuffer(")"); :}
+;   
+args          ::= IDENTIFIER:id LPAREN args:a args2:a2                                                  {: RESULT = new StringBuffer(id + "(" + a + a2); :}
+                |IDENTIFIER:id args2:a2                                                                 {: RESULT = new StringBuffer(id + "" + a2); :}
+                |STRING:s args2:a2                                                                      {: RESULT = new StringBuffer("\"" + s + "\"" + a2); :}
+                |IF LPAREN condition:c RPAREN ifbody:ib ELSE ifbody:eb args2:a2                         {: RESULT = new StringBuffer("(" + c + ")" + "?" + "(" + ib + ")" + ":" + "(" + eb + ")" + a2); :}
+                |RPAREN                                                                                 {: RESULT = new StringBuffer(")"); :}
+;   
+args2         ::= CONCATENATE IDENTIFIER:id LPAREN args:a args2:a2                                      {: RESULT = new StringBuffer(" + " + id + "(" + a + a2); :}
+                |CONCATENATE IDENTIFIER:id args2:a2                                                     {: RESULT = new StringBuffer(" + " + id + a2); :}
+                |CONCATENATE STRING:s args2:a2                                                          {: RESULT = new StringBuffer(" + " + "\"" + s + "\"" + a2); :}
+                |CONCATENATE IF LPAREN condition:c RPAREN ifbody:ib ELSE ifbody:eb args2:a2             {: RESULT = new StringBuffer(" + ((" + c + ")" + "?" + "(" + ib + ")" + ":" + "(" + eb + "))" + a2); :}
+                |COMMA IDENTIFIER:id LPAREN args:ac args2:a2                                            {: RESULT = new StringBuffer(", " + id + "(" + ac + a2); :}
+                |COMMA IDENTIFIER:id args2:a2                                                           {: RESULT = new StringBuffer(", " + id + a2); :}
+                |COMMA STRING:s args2:a2                                                                {: RESULT = new StringBuffer(", " + "\"" + s + "\"" + a2); :}
+                |COMMA IF LPAREN condition:c RPAREN ifbody:ib ELSE ifbody:eb args2:a2                   {: RESULT = new StringBuffer(", (" + c + ")" + "?" + "(" + ib + ")" + ":" + "(" + eb + ")" + a2); :}
+                |RPAREN                                                                                 {: RESULT = new StringBuffer(")"); :}
+;   
+condition     ::= cond:c1 PREFIX cond:c2                                                                {: RESULT = new StringBuffer("(" + c2 + ").startsWith(" + c1 + ")"); :}
+                |cond:c1 SUFFIX cond:c2                                                                 {: RESULT = new StringBuffer("(" + c2 + ").endsWith(" + c1 + ")"); :}
+;   
+cond          ::= IF LPAREN condition:c RPAREN ifbody:ib ELSE ifbody:eb cond2:c2                        {: RESULT = new StringBuffer("(" + "(" + c + ")" + "?" + "(" + ib + ")" + ":" + "(" + eb + ")" + c2 + ")"); :}
+                |IDENTIFIER:id LPAREN args:a cond2:c2                                                   {: RESULT = new StringBuffer("(" + id + "(" + a + c2 + ")"); :}
+                |IDENTIFIER:id cond2:c2                                                                 {: RESULT = new StringBuffer("(" + id + c2 + ")"); :}
+                |STRING:s cond2:c2                                                                      {: RESULT = new StringBuffer("(" + "\"" + s + "\"" + c2 + ")"); :}
+;   
+cond2         ::= CONCATENATE IF LPAREN condition:c RPAREN ifbody:ib ELSE ifbody:eb cond2:c2            {: RESULT = new StringBuffer(" + " + "(" + "(" + c + ")" + "?" + "(" + ib + ")" + ":" + "(" + eb + ")" + ")" + c2); :}
+                |CONCATENATE IDENTIFIER:id LPAREN args:a cond2:c2                                       {: RESULT = new StringBuffer(" + " + "(" + id +  "(" + a + ")" + c2); :}
+                |CONCATENATE IDENTIFIER:id cond2:c2                                                     {: RESULT = new StringBuffer(" + " + "(" + id + ")" + c2); :}
+                |CONCATENATE STRING:s cond2:c2                                                          {: RESULT = new StringBuffer(" + " + "(" + "\"" + s + "\"" + ")" + c2); :}
+                |                                                                                       {: RESULT = new StringBuffer(""); :}
+;   
+ifbody        ::= STRING:s ifbody2:ib2                                                                  {: RESULT = new StringBuffer("\"" + s + "\"" + ib2); :}
+                |IF LPAREN condition:c RPAREN ifbody:ib ELSE ifbody:eb ifbody2:ib2                      {: RESULT = new StringBuffer("(" + c + "?" + ib + ":" + eb + ")" + ib2); :}
+                |IDENTIFIER:id LPAREN args:a ifbody2:ib2                                                {: RESULT = new StringBuffer(id + "(" + a + ib2); :}
+                |IDENTIFIER:id ifbody2:ib2                                                              {: RESULT = new StringBuffer(id + "" + ib2); :}
+;   
+ifbody2       ::=CONCATENATE ifbody:ib                                                                  {: RESULT = new StringBuffer(" + " + ib); :}
+                |                                                                                       {: RESULT = new StringBuffer(""); :}
+;
+commands      ::= CONCATENATE commands2:c3                                                              {: RESULT = new StringBuffer(" + " + c3); :}
+                |commands2:c3                                                                           {: RESULT = new StringBuffer( c3); :}
+;   
+commands2     ::= IDENTIFIER:id LPAREN args:a commands:c2                                               {: RESULT = new StringBuffer(");\n\t\tSystem.out.println(" + id + "(" + a  + c2); :}
+                |                                                                                       {: RESULT = new StringBuffer(");"); :}
+;   
+functbody     ::=IF LPAREN condition:c RPAREN ifbody:ib ELSE ifbody:eb functbody2:f2                    {: RESULT = new StringBuffer("return (" + c + "?" + ib + ":" + eb + f2); :}
+                |IDENTIFIER:id LPAREN args:a functbody2:f2                                              {: RESULT = new StringBuffer("return (" + id + "(" + a + f2); :}
+                |IDENTIFIER:id functbody2:f2                                                            {: RESULT = new StringBuffer("return (" + id + f2); :}
+                |STRING:s functbody2:f2                                                                 {: RESULT = new StringBuffer("return (\"" + s + "\"" + f2); :}
+;
+functbody2    ::= CONCATENATE IF LPAREN condition:c RPAREN ifbody:ib ELSE ifbody:eb functbody2:f2       {: RESULT = new StringBuffer(" + " + c + "?" + ib + ":" + eb + f2); :}
+                |CONCATENATE IDENTIFIER:id LPAREN args:a functbody2:f2                                  {: RESULT = new StringBuffer(" + " + id + "(" + a + f2); :}
+                |CONCATENATE IDENTIFIER:id functbody2:f2                                                {: RESULT = new StringBuffer(" + " + id + f2); :}
+                |CONCATENATE STRING:s functbody2:f2                                                     {: RESULT = new StringBuffer(" + " + "\"" + s + "\"" + f2); :}
+                |RBRACKET                                                                               {: RESULT = new StringBuffer(");\n\t}\n"); :}
+;
